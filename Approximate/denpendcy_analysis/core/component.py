@@ -1,8 +1,7 @@
 import copy
 import matplotlib.pyplot as plt
 import networkx as nx
-import pygraphviz as pgv
-from sympy import Symbol
+
 from sympy.logic.boolalg import Not,Or
 
 class Component:
@@ -52,67 +51,18 @@ class Component:
     def deep_copy(self):
         return copy.deepcopy(self)
     
-class Compressor42:
-    def __init__(self) -> None:
-        self.switch_list = ["S1", "S2", "X1", "X2", "X3", "X4", "Cin"]
-        self.output_name = ["Sum", "Carry","Cout"]
-
-        self.operation_sequence_42 = [
-            "S1=0",  # FALSE(S1)
-            "S2=0",  # FALSE(S2)
-            "X2->S1",  # S1 = ~X2
-            "X1->S1",  # S1 = ~X1 + ~X2
-            "X1->S2",  # S2 = ~X1
-            "S2->X2",  # X2 = X1 + X2
-            "S2=0",  # FALSE(S2)
-            "S1->S2",  # S2 = ~(~X1 + ~X2) = X1X2
-            "X2->S2",  # S2 = ~X1~X2 + X1X2
-            "X2=0",  # FALSE(X2)
-            "S2->X2",  # X2 = X1 ⊕ X2 = G4
-            "X3->S2",  # S2 = G5
-            "X1=0",  # FALSE(X1)
-            "S2->X1",  # X1 = ~G5
-            "S1->X1(Cout)",  # X1 = Cout
-            "S1=0",
-            "X2->S1",
-            "S1->X3",
-            "S1=0",
-            "S2->S1",
-            "X3->S1",
-            "X3=0",
-            "S1->X3",
-            "X4->S1",
-            "X2=0",
-            "X3->X2",
-            "X2->X4",
-            "X2=0",
-            "S1->X2",
-            "X4->X2",
-            "X4=0",
-            "X2->X4",
-            "Cin->X2",
-            "X3=0",
-            "S1->X3",
-            "X2->X3(Carry)",
-            "S2=0",
-            "X4->X2",
-            "S2->Cin",
-            "S1=0",
-            "X2->S1",
-            "Cin->S1",
-            "Cin=0",
-            "S1->Cin(Sum)",
-        ]
+class BasicAdder:
+    def __init_(self) -> None:
+        self.switch_list=[]
+        self.output_name=[]
+        self.operation_sequence=[]
         self.index=0
-        self.node_dict = {}
-        for switch_name in self.switch_list:
-            self.node_dict[switch_name] = Component(switch_name=switch_name, type="input", logic_expression=Symbol(switch_name),index=self.index)
-            self.index+=1
+        self.node_dict={}
         self._build_graph()
-
+    
     def _build_graph(self):
         self.dependency_graph = []
-        for operation in self.operation_sequence_42:
+        for operation in self.operation_sequence:
             if "=0" in operation:
                 # the logic here is that if it is =0, then create a new Component object, and then add it to the dependency_graph
                 # and set the value of the key in node_dict to this new Component, so as to avoid the circular dependency
@@ -164,58 +114,6 @@ class Compressor42:
             if output_name in switch_name:
                 return output_name
         return None
-
-    def visualize_dependency_graph(self,name="dependency_graph.png"):
-        # Create a directed graph
-        G = nx.DiGraph()
-
-        # Add edges and set node labels
-        for edge in self.dependency_graph:
-            sender = edge["sender_componet"].index
-            receiver = edge["receiver_componet"].index
-
-            G.add_edge(sender, receiver)
-            # Ensure edge uniqueness
-            if not G.has_edge(sender, receiver):
-                G.add_edge(sender, receiver)
-
-            # Set node labels
-            G.nodes[sender]["label"] = f"{edge['sender_componet'].index}:{edge['sender_componet'].switch_name}"
-            G.nodes[receiver]["label"] = f"{edge['receiver_componet'].index}:{edge['receiver_componet'].switch_name}"
-
-            # Set edge labels
-            G.edges[sender, receiver]["label"] = edge["operation"]
-
-        # Create an AGraph for better layout control
-        A = nx.nx_agraph.to_agraph(G)
-
-        # Set graph attributes for horizontal layout
-        A.graph_attr.update(rankdir="LR")  # Left to Right layout
-        A.node_attr.update(shape="box", style="rounded,filled", fillcolor="lightblue")
-
-        # Render graph to a file and display
-        A.layout(prog="dot")  # Use Graphviz's dot program for layered layout
-        A.draw(name)
-
-        # Display the generated graph
-        plt.figure(figsize=(15, 4))
-        img = plt.imread(name)
-        plt.imshow(img)
-        plt.axis("off")
-        total_step=self.operation_step()
-        plt.title(f"Dependency Graph (Computation Style, Total Step: {total_step})")
-        #plt.show()
-        plt.savefig(name, dpi=500)
-    
-    def operation_step(self):
-        step=0
-        for operation in self.dependency_graph:
-            if "UPDATE" in operation["operation"]:
-                pass
-            else:
-                step+=1
-        
-        return step
     
     def drop_output(self, drop_output_name: str):
         """
@@ -264,14 +162,54 @@ class Compressor42:
             if previous_node.index not in necessary_nodes:
                 self._find_necessary_nodes(previous_node, necessary_nodes)
 
-if __name__ == "__main__":
-    compressor42=Compressor42()  
-    compressor42.visualize_dependency_graph("42denpendency_graph.png")
-    compressor42.drop_output("Carry")
-    compressor42.visualize_dependency_graph("42denpendency_graph_drop_Carry.png")
-    compressor42=Compressor42()  
-    compressor42.drop_output("Sum")
-    compressor42.visualize_dependency_graph("42denpendency_graph_drop_Sum.png")
-    compressor42=Compressor42()
-    compressor42.drop_output("Cout")
-    compressor42.visualize_dependency_graph("42denpendency_graph_drop_Cout.png")
+    def operation_step(self):
+        step=0
+        for operation in self.dependency_graph:
+            if "UPDATE" in operation["operation"]:
+                pass
+            else:
+                step+=1
+    
+        return step
+    
+    def visualize_dependency_graph(self,name="dependency_graph.png"):
+        # Create a directed graph
+        G = nx.DiGraph()
+
+        # Add edges and set node labels
+        for edge in self.dependency_graph:
+            sender = edge["sender_componet"].index
+            receiver = edge["receiver_componet"].index
+
+            G.add_edge(sender, receiver)
+            # Ensure edge uniqueness
+            if not G.has_edge(sender, receiver):
+                G.add_edge(sender, receiver)
+
+            # Set node labels
+            G.nodes[sender]["label"] = f"{edge['sender_componet'].index}:{edge['sender_componet'].switch_name}"
+            G.nodes[receiver]["label"] = f"{edge['receiver_componet'].index}:{edge['receiver_componet'].switch_name}"
+
+            # Set edge labels
+            G.edges[sender, receiver]["label"] = edge["operation"]
+
+        # Create an AGraph for better layout control
+        A = nx.nx_agraph.to_agraph(G)
+
+        # Set graph attributes for horizontal layout
+        A.graph_attr.update(rankdir="LR")  # Left to Right layout
+        A.node_attr.update(shape="box", style="rounded,filled", fillcolor="lightblue")
+
+        # Render graph to a file and display
+        A.layout(prog="dot")  # Use Graphviz's dot program for layered layout
+        A.draw(name)
+
+        # Display the generated graph
+        plt.figure(figsize=(15, 4))
+        img = plt.imread(name)
+        plt.imshow(img)
+        plt.axis("off")
+        total_step=self.operation_step()
+        plt.title(f"Dependency Graph (Computation Style, Total Step: {total_step})")
+        plt.savefig(name, dpi=500)
+        print("generate visualization successfully,stored in ",name)

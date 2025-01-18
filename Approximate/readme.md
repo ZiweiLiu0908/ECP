@@ -11,9 +11,12 @@ In order to be able to use heuristic methods, we need to specify a good evaluati
 The evaluation indicators we use here mainly include two aspects: 1. Ignoring the impact of a single or multiple 4-2 compression-based adders on the calculation steps of the entire 8-bit multiplier. 2. Ignoring the error impact and variance of a single or multiple 4-2 compression-based adders on the entire 8-bit multiplier LUT table.
 ####  Processing of evaluation matricx 1
 1. Here we mainly construct three different adders based on the paper `Power-Area Efficient Serial IMPLY-based 4-2 Compressor Applied in Data-Intensive Application` and construct a logical expression tree according to the algorithm flow.
-![4-2 compressor based adder](./pic/4-2dependency_graph.png)
-2. We can determine the predecessors that carry and cout depend on based on the established logical expression tree, and delete these predecessors to determine the number of steps that can be reduced.
-3. And we can construct a larger multiplication logic expression tree to detect the impact of the change of the carry of a 4-2 compression-based adder on the adder (hereinafter referred to as a) that depends on its result, so as to update the adder process of a. In this way, we can save steps in the entire multiplication logic.
+![4-2 compressor based adder](./pic/42denpendency_graph.png)
+![4-2 compressor based adder drop Carry](./pic/42denpendency_graph_drop_Carry.png)
+![4-2 compressor based adder drop Cout](./pic/42denpendency_graph_drop_Cout.png)
+![4-2 compressor based adder drop Sum](./pic/42denpendency_graph_drop_Sum.png)
+3. We can determine the predecessors that carry and cout depend on based on the established logical expression tree, and delete these predecessors to determine the number of steps that can be reduced.
+4. And we can construct a larger multiplication logic expression tree to detect the impact of the change of the carry of a 4-2 compression-based adder on the adder (hereinafter referred to as a) that depends on its result, so as to update the adder process of a. In this way, we can save steps in the entire multiplication logic.
 #### Processing of evaluation matricx 2
 1. Based on the indicator 2, we can traverse the 8-bit input according to the ignored situation to construct a new LUT table for comparison with the standard LUT table.
 2. In this way, we can calculate the error and standard deviation between the new LUT table and the old LUT table.

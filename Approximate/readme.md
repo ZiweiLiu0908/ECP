@@ -34,10 +34,10 @@ TBD
 # Todo
 - [x] Determine the architecture：Sequence-based 4-2 compression-based adder
 - [x] Baseline evaluation for automic
-- [] Baseline power analysis using LTSpice
+- [ ] Baseline power analysis using LTSpice
 - [x] Approximate method 1 Dependency graph construction
-- [] Complete approximate step calculation
-- [] Heuristics and Evaluation
-- [] Approximate method 2 LUT table generation and Logical Processing Flow
-- [] Approximate Method 2 Evaluation
-- [] Implementation and evaluation of combined approximation method 1 and approximation method 2
+- [ ] Complete approximate step calculation
+- [ ] Heuristics and Evaluation
+- [ ] Approximate method 2 LUT table generation and Logical Processing Flow
+- [ ] Approximate Method 2 Evaluation
+- [ ] Implementation and evaluation of combined approximation method 1 and approximation method 2

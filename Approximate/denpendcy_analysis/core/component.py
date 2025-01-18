@@ -114,8 +114,8 @@ class Compressor42:
         self.dependency_graph = []
         for operation in self.operation_sequence_42:
             if "=0" in operation:
-                # 这里的逻辑是，如果是=0，那么创建一个新的Component对象，然后将其加入到dependency_graph中
-                # 并将node_dict中的key为switch_name的值设置为这个新的Component，从而避免依赖关系的循环
+                # the logic here is that if it is =0, then create a new Component object, and then add it to the dependency_graph
+                # and set the value of the key in node_dict to this new Component, so as to avoid the circular dependency
                 switch_name = operation.split("=")[0]
                 logic_expression=False
                 component=Component(switch_name=switch_name, type="input", logic_expression=logic_expression,index=self.index)
@@ -123,9 +123,9 @@ class Compressor42:
                 self.node_dict[switch_name] = component
                 self.index+=1
             elif "->" in operation:
-                # 这里的逻辑是，如果是->，那么将sender和receiver分别提取出来
-                # 将sender的component提取出来，如果不存在，那么创建一个新的Component对象
-                # 而receiver的component则直接创建一个新的Component对象
+                # the logic here is that if it is ->, then extract sender and receiver respectively
+                # extract the component of sender
+                # while the component of receiver directly creates a new Component object, and then add it to the dependency_graph
                 switch_name_1, switch_name_2 = operation.split("->")
                 sender=self.node_dict.get(switch_name_1)
                 if sender is None:
@@ -165,7 +165,7 @@ class Compressor42:
                 return output_name
         return None
 
-    def visualize_dependency_graph(self):
+    def visualize_dependency_graph(self,name="dependency_graph.png"):
         # Create a directed graph
         G = nx.DiGraph()
 
@@ -180,8 +180,8 @@ class Compressor42:
                 G.add_edge(sender, receiver)
 
             # Set node labels
-            G.nodes[sender]["label"] = edge["sender_componet"].switch_name
-            G.nodes[receiver]["label"] = edge["receiver_componet"].switch_name
+            G.nodes[sender]["label"] = f"{edge['sender_componet'].index}:{edge['sender_componet'].switch_name}"
+            G.nodes[receiver]["label"] = f"{edge['receiver_componet'].index}:{edge['receiver_componet'].switch_name}"
 
             # Set edge labels
             G.edges[sender, receiver]["label"] = edge["operation"]
@@ -195,16 +195,17 @@ class Compressor42:
 
         # Render graph to a file and display
         A.layout(prog="dot")  # Use Graphviz's dot program for layered layout
-        A.draw("dependency_graph.png")
+        A.draw(name)
 
         # Display the generated graph
         plt.figure(figsize=(15, 4))
-        img = plt.imread("dependency_graph.png")
+        img = plt.imread(name)
         plt.imshow(img)
         plt.axis("off")
-        plt.title("Dependency Graph (Computation Style)")
+        total_step=self.operation_step()
+        plt.title(f"Dependency Graph (Computation Style, Total Step: {total_step})")
         #plt.show()
-        plt.savefig("dependency_graph.png", dpi=500)
+        plt.savefig(name, dpi=500)
     
     def operation_step(self):
         step=0
@@ -215,8 +216,62 @@ class Compressor42:
                 step+=1
         
         return step
+    
+    def drop_output(self, drop_output_name: str):
+        """
+        Drop all operations related to the specified output name.
+        """
+        if drop_output_name not in self.output_name:
+            raise ValueError(f"Invalid output name: {drop_output_name}")
+
+        necessary_nodes = set()
+
+        output_nodes=[]
+        output_name=self.output_name.remove(drop_output_name)
+        for idx in range(len(self.dependency_graph)-1,-1,-1):
+            for output_name in self.output_name:
+                if output_name in self.dependency_graph[idx]["operation"]:
+                    output_nodes.append(self.dependency_graph[idx]["receiver_componet"])
+        
+        for output_node in output_nodes:
+            self._find_necessary_nodes(output_node, necessary_nodes)
+        
+        new_dependency_graph = []
+        for node in self.dependency_graph:
+            if node["receiver_componet"].index in necessary_nodes and node["sender_componet"].index in necessary_nodes:
+                new_dependency_graph.append(node)
+                sender_previous=node["sender_componet"].get_previous_component_list()
+                receiver_previous=node["receiver_componet"].get_previous_component_list()
+                sender_next=node["sender_componet"].get_next_component_list()
+                receiver_next=node["receiver_componet"].get_next_component_list()
+                for idx in range(len(sender_previous)-1,-1,-1):
+                    if sender_previous[idx].index not in necessary_nodes:
+                        sender_previous.pop(idx)
+                for idx in range(len(receiver_previous)-1,-1,-1):
+                    if receiver_previous[idx].index not in necessary_nodes:
+                        receiver_previous.pop(idx)
+                for idx in range(len(sender_next)-1,-1,-1):
+                    if sender_next[idx].index not in necessary_nodes:
+                        sender_next.pop(idx)
+                for idx in range(len(receiver_next)-1,-1,-1):
+                    if receiver_next[idx].index not in necessary_nodes:
+                        receiver_next.pop(idx)
+        self.dependency_graph = new_dependency_graph
+            
+    def _find_necessary_nodes(self, node, necessary_nodes):
+        necessary_nodes.add(node.index)
+        for previous_node in node.get_previous_component_list():
+            if previous_node.index not in necessary_nodes:
+                self._find_necessary_nodes(previous_node, necessary_nodes)
 
 if __name__ == "__main__":
+    compressor42=Compressor42()  
+    compressor42.visualize_dependency_graph("42denpendency_graph.png")
+    compressor42.drop_output("Carry")
+    compressor42.visualize_dependency_graph("42denpendency_graph_drop_Carry.png")
+    compressor42=Compressor42()  
+    compressor42.drop_output("Sum")
+    compressor42.visualize_dependency_graph("42denpendency_graph_drop_Sum.png")
     compressor42=Compressor42()
-    compressor42.visualize_dependency_graph()  
-    print(compressor42.operation_step())       
+    compressor42.drop_output("Cout")
+    compressor42.visualize_dependency_graph("42denpendency_graph_drop_Cout.png")

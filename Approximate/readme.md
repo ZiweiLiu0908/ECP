@@ -16,6 +16,7 @@ The evaluation indicators we use here mainly include two aspects: 1. Ignoring th
 ![4-2 compressor based adder drop Cout](./pic/42denpendency_graph_drop_Cout.png)
 ![4-2 compressor based adder drop Sum](./pic/42denpendency_graph_drop_Sum.png)
 3. We can determine the predecessors that carry and cout depend on based on the established logical expression tree, and delete these predecessors to determine the number of steps that can be reduced.
+![8bit multiplier baseline](./pic/multiplier_dependency_graph.png)
 4. And we can construct a larger multiplication logic expression tree to detect the impact of the change of the carry of a 4-2 compression-based adder on the adder (hereinafter referred to as a) that depends on its result, so as to update the adder process of a. In this way, we can save steps in the entire multiplication logic.
 #### Processing of evaluation matricx 2
 1. Based on the indicator 2, we can traverse the 8-bit input according to the ignored situation to construct a new LUT table for comparison with the standard LUT table.

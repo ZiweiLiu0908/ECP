@@ -2,6 +2,7 @@ import copy
 import matplotlib.pyplot as plt
 import networkx as nx
 
+from sympy import Symbol,simplify
 from sympy.logic.boolalg import Not,Or
 
 class Component:
@@ -25,6 +26,7 @@ class Component:
         return self.logic_expression
     
     def set_logic_expression(self, logic_expression):
+        # lets do some modify
         self.logic_expression = logic_expression
 
     def get_previous_component_list(self):
@@ -52,15 +54,28 @@ class Component:
         return copy.deepcopy(self)
     
 class BasicAdder:
-    def __init_(self) -> None:
-        self.switch_list=[]
-        self.output_name=[]
-        self.operation_sequence=[]
-        self.index=0
-        self.node_dict={}
-        self._build_graph()
+    def __init__(self) -> None:
+        self.switch_list = []
+        self.output_name = []
+        self.operation_sequence = []
+        self.adder_id = 0
     
     def _build_graph(self):
+        def _check_output(switch_name,output_name_list):
+            for output_name in output_name_list:
+                if output_name in switch_name:
+                    return output_name
+            return None
+        self.index=0
+        self.node_dict = {}
+        self.output_switch_dict = {}
+        self.input_switch_dict={}
+        for switch_name in self.switch_list:
+            self.node_dict[switch_name] = Component(switch_name=switch_name, type="input", logic_expression=Symbol(switch_name),index=self.index)
+            if switch_name not in self.input_switch_dict:
+                self.input_switch_dict[switch_name] = []
+            self.input_switch_dict[switch_name].append(self.node_dict[switch_name])
+            self.index+=1
         self.dependency_graph = []
         for operation in self.operation_sequence:
             if "=0" in operation:
@@ -70,69 +85,69 @@ class BasicAdder:
                 logic_expression=False
                 component=Component(switch_name=switch_name, type="input", logic_expression=logic_expression,index=self.index)
                 self.dependency_graph.append({"sender_componet":component,"receiver_componet":component,"operation":operation})
+                if switch_name not in self.input_switch_dict:
+                    self.input_switch_dict[switch_name]=[]
+                self.input_switch_dict[switch_name].append(component)
                 self.node_dict[switch_name] = component
                 self.index+=1
             elif "->" in operation:
                 # the logic here is that if it is ->, then extract sender and receiver respectively
                 # extract the component of sender
                 # while the component of receiver directly creates a new Component object, and then add it to the dependency_graph
-                switch_name_1, switch_name_2 = operation.split("->")
-                sender=self.node_dict.get(switch_name_1)
+                sender_switch, receiver_switch = operation.split("->")
+                sender=self.node_dict.get(sender_switch)
                 if sender is None:
                     raise ValueError(f"Invalid operation: {operation}")
                 
-                output_tag=self._check_output(switch_name_2)
+                output_tag=_check_output(receiver_switch,self.output_name)
                 if output_tag is not None:
-                    switch_name_2=switch_name_2.replace(f"({output_tag})","")
+                    receiver_switch=receiver_switch.replace(f"({output_tag})","")
                     swich_type="output"
+                    self.output_switch_dict[receiver_switch]=output_tag
                 else:
                     swich_type="state"
 
-                receiver_last=self.node_dict.get(switch_name_2)
+                receiver_last=self.node_dict.get(receiver_switch)
                 if receiver_last is None:
                     raise ValueError(f"Invalid operation: {operation}")
                 
-                receiver=Component(switch_name=switch_name_2, type=swich_type, logic_expression=receiver_last.get_logic_expression(),index=self.index)
+                receiver=Component(switch_name=receiver_switch, type=swich_type, logic_expression=Or(Not(sender.get_logic_expression()),receiver_last.get_logic_expression()),index=self.index)          
                 self.index+=1
+
                 receiver.add_previous_component(receiver_last)
                 receiver_last.add_next_component(receiver)
-                self.dependency_graph.append({"sender_componet":receiver_last,"receiver_componet":receiver,"operation":f"UPDATE:{switch_name_2}"})
+                self.dependency_graph.append({"sender_componet":receiver_last,"receiver_componet":receiver,"operation":f"UPDATE:{receiver_switch}"})
                 
                 sender.add_next_component(receiver)
                 receiver.add_previous_component(sender)
-                sender_logic_expression = sender.get_logic_expression()
-                receiver_logic_expression = receiver.get_logic_expression()
-                receiver.set_logic_expression(Or(Not(sender_logic_expression), receiver_logic_expression))
                 self.dependency_graph.append({"sender_componet":sender,"receiver_componet":receiver,"operation":operation})
                 
-                self.node_dict[switch_name_1] = sender
-                self.node_dict[switch_name_2] = receiver
-        print("generate dependency graph successfully")
-    
-    def _check_output(self, switch_name):
-        for output_name in self.output_name:
-            if output_name in switch_name:
-                return output_name
-        return None
+                self.node_dict[sender_switch] = sender
+                self.node_dict[receiver_switch] = receiver
+
     
     def drop_output(self, drop_output_name: str):
         """
         Drop all operations related to the specified output name.
         """
+        def _find_necessary_nodes(node, necessary_nodes):
+            necessary_nodes.add(node.index)
+            for previous_node in node.get_previous_component_list():
+                if previous_node.index not in necessary_nodes:
+                    _find_necessary_nodes(previous_node, necessary_nodes)
+
         if drop_output_name not in self.output_name:
             raise ValueError(f"Invalid output name: {drop_output_name}")
 
         necessary_nodes = set()
 
         output_nodes=[]
-        output_name=self.output_name.remove(drop_output_name)
-        for idx in range(len(self.dependency_graph)-1,-1,-1):
-            for output_name in self.output_name:
-                if output_name in self.dependency_graph[idx]["operation"]:
-                    output_nodes.append(self.dependency_graph[idx]["receiver_componet"])
+        for key, value in self.output_switch_dict.items():
+            if value != drop_output_name:
+                output_nodes.append(self.node_dict[key])
         
         for output_node in output_nodes:
-            self._find_necessary_nodes(output_node, necessary_nodes)
+            _find_necessary_nodes(output_node, necessary_nodes)
         
         new_dependency_graph = []
         for node in self.dependency_graph:
@@ -155,13 +170,12 @@ class BasicAdder:
                     if receiver_next[idx].index not in necessary_nodes:
                         receiver_next.pop(idx)
         self.dependency_graph = new_dependency_graph
+        
+        for key, value in self.output_switch_dict.items():
+            if value == drop_output_name:
+                self.node_dict[key]=Component(switch_name=key, type="deleted", logic_expression=False,index=self.index)
+                self.index+=1
             
-    def _find_necessary_nodes(self, node, necessary_nodes):
-        necessary_nodes.add(node.index)
-        for previous_node in node.get_previous_component_list():
-            if previous_node.index not in necessary_nodes:
-                self._find_necessary_nodes(previous_node, necessary_nodes)
-
     def operation_step(self):
         step=0
         for operation in self.dependency_graph:
@@ -173,38 +187,28 @@ class BasicAdder:
         return step
     
     def visualize_dependency_graph(self,name="dependency_graph.png"):
-        # Create a directed graph
         G = nx.DiGraph()
 
-        # Add edges and set node labels
         for edge in self.dependency_graph:
             sender = edge["sender_componet"].index
             receiver = edge["receiver_componet"].index
 
             G.add_edge(sender, receiver)
-            # Ensure edge uniqueness
             if not G.has_edge(sender, receiver):
                 G.add_edge(sender, receiver)
 
-            # Set node labels
             G.nodes[sender]["label"] = f"{edge['sender_componet'].index}:{edge['sender_componet'].switch_name}"
             G.nodes[receiver]["label"] = f"{edge['receiver_componet'].index}:{edge['receiver_componet'].switch_name}"
 
-            # Set edge labels
             G.edges[sender, receiver]["label"] = edge["operation"]
 
-        # Create an AGraph for better layout control
         A = nx.nx_agraph.to_agraph(G)
-
-        # Set graph attributes for horizontal layout
-        A.graph_attr.update(rankdir="LR")  # Left to Right layout
+        A.graph_attr.update(rankdir="LR") 
         A.node_attr.update(shape="box", style="rounded,filled", fillcolor="lightblue")
 
-        # Render graph to a file and display
-        A.layout(prog="dot")  # Use Graphviz's dot program for layered layout
+        A.layout(prog="dot")
         A.draw(name)
 
-        # Display the generated graph
         plt.figure(figsize=(15, 4))
         img = plt.imread(name)
         plt.imshow(img)
@@ -213,3 +217,33 @@ class BasicAdder:
         plt.title(f"Dependency Graph (Computation Style, Total Step: {total_step})")
         plt.savefig(name, dpi=500)
         print("generate visualization successfully,stored in ",name)
+    
+    def get_output_logic_expression(self):
+        output_logic_expression = {}
+        for key, value in self.output_switch_dict.items():
+            output_logic_expression[value] = self.node_dict[key].get_logic_expression()
+        return output_logic_expression
+    
+    def set_input(self,swich_name:str,value):
+        if not hasattr(self,"input_value"):
+            self.input_value={}
+        self.input_value[swich_name]=value
+
+    def get_output(self,swich_name:str):
+        for output_switch_name,output_tag in self.output_switch_dict.items():
+            if output_tag==swich_name:
+                return self.node_dict[output_switch_name].get_logic_expression()
+    
+    def forward(self,value_dict):
+        output_dict={}
+        for output_switch_name,output_tag in self.output_switch_dict.items():
+            output_dict[output_tag]=self.node_dict[output_switch_name].get_logic_expression().subs(value_dict)
+        return output_dict
+
+    def clear_input(self,swich_name:str):
+        if hasattr(self,"input_value"):
+            if swich_name in self.input_value:
+                del self.input_value[swich_name]
+    
+    def set_id(self,adder_id:int):
+        self.adder_id=adder_id

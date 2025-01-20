@@ -40,7 +40,7 @@ TBD
 - [x] Baseline evaluation for automic
 - [ ] Baseline power analysis using LTSpice
 - [x] Approximate method 1 Dependency graph construction
-- [ ] Complete approximate step calculation
+- [x] Complete approximate step calculation
 - [ ] Heuristics and Evaluation
 - [ ] Approximate method 2 LUT table generation and Logical Processing Flow
 - [ ] Approximate Method 2 Evaluation

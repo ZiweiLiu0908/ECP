@@ -237,7 +237,10 @@ class BasicAdder:
     def forward(self,value_dict):
         output_dict={}
         for output_switch_name,output_tag in self.output_switch_dict.items():
-            output_dict[output_tag]=self.node_dict[output_switch_name].get_logic_expression().subs(value_dict)
+            if not isinstance(self.node_dict[output_switch_name].get_logic_expression(),bool):
+                output_dict[output_tag]=self.node_dict[output_switch_name].get_logic_expression().subs(value_dict)
+            else:
+                output_dict[output_tag]=self.node_dict[output_switch_name].get_logic_expression()
         return output_dict
 
     def clear_input(self,swich_name:str):
@@ -247,3 +250,12 @@ class BasicAdder:
     
     def set_id(self,adder_id:int):
         self.adder_id=adder_id
+    
+    def support_drop_type(self):
+        output_name_list=[]
+        for output_name in self.output_name:
+            if output_name=="Sum":
+                continue
+            else:
+                output_name_list.append(output_name)
+        return output_name_list

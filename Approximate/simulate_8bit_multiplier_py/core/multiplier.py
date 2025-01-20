@@ -2,6 +2,7 @@ try:
     from core.adder import FullAdder, HalfAdder,Compressor_4_2,AND_GATE
 except:
     from .adder import FullAdder, HalfAdder,Compressor_4_2,AND_GATE
+from cv2 import add
 from sympy import Symbol
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -110,7 +111,7 @@ class Multiplier:
         self.connect("a2b1", "Sum", "ca_3", "X2")
         self.connect("a1b2", "Sum", "ca_3", "X3")
         self.connect("a0b3", "Sum", "ca_3", "X4")
-        self.connect("fa_2", "Sum", "ca_3", "Cin")
+        self.connect("fa_2", "Cout", "ca_3", "Cin")
 
         # ca_4
         self.connect("a4b0", "Sum", "ca_4", "X1")
@@ -124,21 +125,21 @@ class Multiplier:
         self.connect("a4b1", "Sum", "ca_5", "X2")
         self.connect("a3b2", "Sum", "ca_5", "X3")
         self.connect("a2b3", "Sum", "ca_5", "X4")
-        self.connect("a0b5", "Sum", "ca_5", "Cin")
+        self.connect("a1b4", "Sum", "ca_5", "Cin")
 
         # ca_6
         self.connect("a6b0", "Sum", "ca_6", "X1")
         self.connect("a5b1", "Sum", "ca_6", "X2")
         self.connect("a4b2", "Sum", "ca_6", "X3")
         self.connect("a3b3", "Sum", "ca_6", "X4")
-        self.connect("a0b6", "Sum", "ca_6", "Cin")
+        self.connect("a2b4", "Sum", "ca_6", "Cin")
 
         # ca_7
         self.connect("a7b0", "Sum", "ca_7", "X1")
         self.connect("a6b1", "Sum", "ca_7", "X2")
         self.connect("a5b2", "Sum", "ca_7", "X3")
         self.connect("a4b3", "Sum", "ca_7", "X4")
-        self.connect("a0b7", "Sum", "ca_7", "Cin")
+        self.connect("a3b4", "Sum", "ca_7", "Cin")
 
         # ca_8
         self.connect("a7b1", "Sum", "ca_8", "X1")
@@ -277,7 +278,7 @@ class Multiplier:
         self.output_logic_expression["y8"]={"ha_27":"Sum"}
 
         # ca_28
-        self.connect("a3b7","Sum","ca_28","X1")
+        self.connect("a2b7","Sum","ca_28","X1")
         self.connect("ca_9","Sum","ca_28","X2")
         self.connect("ca_8","Cout","ca_28","X3")
         self.connect("ca_8","Carry","ca_28","X4")
@@ -386,9 +387,15 @@ class Multiplier:
 
     def visualize_dependency_graph(self,name="multiplier_dependency_graph.png"):
         G = nx.DiGraph()
-        for adder_id, adder in self.adder_dict.items():
+        for idex,(adder_id, adder) in enumerate(self.adder_dict.items()):
             G.add_node(adder_id)
-            G.nodes[adder_id]["label"] = adder_id
+            G.nodes[adder_id]["label"] = f"{idex}: {adder_id}"
+        
+        for output_name, output in self.output_logic_expression.items():
+            G.add_node(output_name)
+            for key,value in output.items():
+                G.add_edge(key,output_name)
+                G.edges[key,output_name]["label"]=value
 
         for adder_id, connections in self.connections.items():
             for dst_id, dst_port in connections["outputs"]:
@@ -397,7 +404,13 @@ class Multiplier:
 
         A=nx.nx_agraph.to_agraph(G)
         A.graph_attr.update(randir="LR")
-        A.node_attr.update(shape="box", style="rounded,filled", fillcolor="lightblue")
+
+        for node_name in A.nodes():
+            node=A.get_node(node_name)
+            if node_name in self.output_logic_expression.keys():
+                node.attr.update({"fillcolor": "orange", "shape": "box", "style": "rounded,filled"})
+            else:
+                node.attr.update({"fillcolor": "lightblue", "shape": "box", "style": "rounded,filled"})
 
         A.layout(prog="dot")
         A.draw(name)
@@ -412,14 +425,64 @@ class Multiplier:
         print("generate visualization successfully,stored in ",name)
 
     def drop_adder_Carry_or_Cout(self,adder_id,tag):
-        if adder_id not in self.adder_dict:
-            raise ValueError(f"Invalid adder ID: {adder_id}")
-        if tag=="Carry":
-            self.adder_dict[adder_id].drop_output("Carry")
-        elif tag=="Cout":
-            self.adder_dict[adder_id].drop_output("Cout")
-        elif tag=="Carry_and_Cout":
-            self.adder_dict[adder_id].drop_output("Carry")
-            self.adder_dict[adder_id].drop_output("Cout")
+        if adder_id in self.forward_sequence["adders"]:
+            adder_tag_id=self.forward_sequence["adders"][adder_id]
+        elif adder_id in self.adder_dict:
+            adder_tag_id=adder_id
         else:
+            raise ValueError(f"Invalid adder ID: {adder_id}")
+        
+        try:
+            if isinstance(tag,str):
+                self.adder_dict[adder_tag_id].drop_output(tag)
+            elif isinstance(tag,list):
+                for t in tag:
+                    self.adder_dict[adder_tag_id].drop_output(t)
+            else:
+                raise ValueError(f"Invalid tag: {tag}")
+        except:
             raise ValueError(f"Invalid tag: {tag}")
+        
+    def support_drop_type(self):
+        support_drop_type_dict = {}
+        for adder_id, adder in self.adder_dict.items():
+            support_drop_type_dict[adder_id] = adder.support_drop_type()
+
+        support_combine_dict = {}
+        for key, value in support_drop_type_dict.items():
+            new_key = tuple(value)
+            if new_key not in support_combine_dict:
+                support_combine_dict[new_key] = []
+            support_combine_dict[new_key].append(key)
+
+        for key, value in support_combine_dict.items():
+            adder_id = ",".join(value) 
+            print(f"Adder ID: {adder_id} support drop type: {list(key)}") 
+
+    def check_is_correct(self):
+        for adder_id, adder in self.adder_dict.items():
+            if isinstance(adder,AND_GATE):
+                continue
+            if isinstance(adder,FullAdder):
+                connect=self.connections[adder_id]
+                output=2
+                if adder_id in ["fa_31","fa_33"]:
+                    output=1
+                elif adder_id =="fa_35":
+                    output=0
+                if len(connect["inputs"])!=3 or len(connect["outputs"])!=output:
+                    raise ValueError(f"FullAdder {adder_id} is not correct,inputs:{len(connect['inputs'])},outputs:{len(connect['outputs'])}")
+            if isinstance(adder,HalfAdder):
+                connect=self.connections[adder_id]
+                output=1
+                if adder_id in ["ha_1","ha_13","ha_14","ha_16","ha_18","ha_21","ha_24","ha_27"]:
+                    output=0
+                if len(connect["inputs"])!=2 or len(connect["outputs"])!=1:
+                    raise ValueError(f"HalfAdder {adder_id} is not correct,inputs:{len(connect['inputs'])},outputs:{len(connect['outputs'])}")
+            if isinstance(adder,Compressor_4_2):    
+                connect=self.connections[adder_id]
+                output=3
+                if adder_id in ["ca_29","ca_32","ca_34"]:
+                    output=2
+                if len(connect["inputs"])!=5 or len(connect["outputs"])!=output:
+                    raise ValueError(f"Compressor_4_2 {adder_id} is not correct,inputs:{len(connect['inputs'])},outputs:{len(connect['outputs'])}")

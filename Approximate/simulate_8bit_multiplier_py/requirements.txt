@@ -1,0 +1,5 @@
+matplotlib==3.8.4
+more_itertools==10.6.0
+networkx==3.2.1
+numpy==2.2.2
+sympy==1.12

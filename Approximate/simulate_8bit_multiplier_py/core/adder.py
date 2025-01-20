@@ -145,5 +145,8 @@ class AND_GATE(BasicAdder):
             symbol={}
             for key,value in self.input_value.items():
                 symbol[Symbol(key)]=value.subs(value_dict)
-            output_dict[output_tag]=self.node_dict[output_switch_name].get_logic_expression().subs(symbol)
+            if not isinstance(self.node_dict[output_switch_name].get_logic_expression(),bool):
+                output_dict[output_tag]=self.node_dict[output_switch_name].get_logic_expression().subs(symbol)
+            else:
+                output_dict[output_tag]=self.node_dict[output_switch_name].get_logic_expression()
         return output_dict

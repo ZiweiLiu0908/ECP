@@ -1,9 +1,10 @@
 try:
-    from core.component import Component,BasicAdder
+    from core.component import BasicAdder
 except:
-    from .component import Component,BasicAdder
+    from .component import BasicAdder
 
 from sympy import Symbol
+
 class Compressor_4_2(BasicAdder):
     def __init__(self):
         super().__init__()
@@ -56,17 +57,42 @@ class Compressor_4_2(BasicAdder):
             "Cin=0",
             "S1->Cin(Sum)",
         ]
-        self.index=0
-        self.node_dict = {}
-        self.output_switch_dict = {}
-        self.input_switch_dict={}
-        for switch_name in self.switch_list:
-            self.node_dict[switch_name] = Component(switch_name=switch_name, type="input", logic_expression=Symbol(switch_name),index=self.index)
-            if switch_name not in self.input_switch_dict:
-                self.input_switch_dict[switch_name] = []
-            self.input_switch_dict[switch_name].append(self.node_dict[switch_name])
-            self.index+=1
+        self.approximation_sequence = [
+            "S1=0",  # FALSE(S1)
+            "S2=0",  # FALSE(S2)
+            "X2->S1",  # S1 = ~X2
+            "X1->S1",  # S1 = ~X1 + ~X2
+            "X1->S2",  # S2 = ~X1
+            "S2->X2",  # X2 = X1 + X2
+            "S2=0",  # FALSE(S2)
+            "S1->S2",  # S2 = ~(~X1 + ~X2) = X1X2
+            "X2->S2",  # S2 = ~X1~X2 + X1X2
+            "X2=0",  # FALSE(X2)
+            "S2->X2",  # X2 = X1 ⊕ X2 = G4
+            "X3->S2",  # S2 = G5 =
+            "X1=0",  # FALSE(X1)
+            "S2->X1",  # X1 = ~G5
+            "S1->X1(Cout)",  # X1 = Cout
+            "S1=0",
+            "X4->S1", # S1=~X4
+            "S2->S1", # S1= ~(G5 AND G4)
+            "S1->Cin(Carry)",
+            "X3=0",
+            "Cin->X3(Sum)",
+        ]
+        self.adder_type="exact"
         self._build_graph()
+
+    def convert_mode(self):
+        temp=self.operation_sequence    
+        self.operation_sequence=self.approximation_sequence
+        self.approximation_sequence=temp
+        self._build_graph()
+        if self.adder_type=="exact":
+            self.adder_type="approximate"
+        else:
+            self.adder_type="exact"
+        print(f"Adder type changed to {self.adder_type}")
 
 class HalfAdder(BasicAdder):
     def __init__(self) -> None:
@@ -126,14 +152,14 @@ class FullAdder(BasicAdder):
 class AND_GATE(BasicAdder):
     def __init__(self) -> None:
         super().__init__()
-        self.switch_list = ["X1","X2","S1"]
+        self.switch_list = ["X1","X2","S1","S2"]
         self.output_name = ["Sum"]
         self.operation_sequence=[
             "S1=0",
             "X2->S1",
             "X1->S1",
-            "X1=0",
-            "S1->X1(Sum)"
+            "S2=0",
+            "S1->S2(Sum)"
         ]
         self._build_graph()
     

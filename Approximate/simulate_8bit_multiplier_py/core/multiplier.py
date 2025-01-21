@@ -3,6 +3,7 @@ try:
 except:
     from .adder import FullAdder, HalfAdder,Compressor_4_2,AND_GATE
 from cv2 import add
+from numpy import False_
 from sympy import Symbol
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -459,30 +460,160 @@ class Multiplier:
             adder_id = ",".join(value) 
             print(f"Adder ID: {adder_id} support drop type: {list(key)}") 
 
-    def check_is_correct(self):
-        for adder_id, adder in self.adder_dict.items():
-            if isinstance(adder,AND_GATE):
-                continue
-            if isinstance(adder,FullAdder):
-                connect=self.connections[adder_id]
-                output=2
-                if adder_id in ["fa_31","fa_33"]:
-                    output=1
-                elif adder_id =="fa_35":
-                    output=0
-                if len(connect["inputs"])!=3 or len(connect["outputs"])!=output:
-                    raise ValueError(f"FullAdder {adder_id} is not correct,inputs:{len(connect['inputs'])},outputs:{len(connect['outputs'])}")
-            if isinstance(adder,HalfAdder):
-                connect=self.connections[adder_id]
-                output=1
-                if adder_id in ["ha_1","ha_13","ha_14","ha_16","ha_18","ha_21","ha_24","ha_27"]:
-                    output=0
-                if len(connect["inputs"])!=2 or len(connect["outputs"])!=1:
-                    raise ValueError(f"HalfAdder {adder_id} is not correct,inputs:{len(connect['inputs'])},outputs:{len(connect['outputs'])}")
-            if isinstance(adder,Compressor_4_2):    
-                connect=self.connections[adder_id]
-                output=3
-                if adder_id in ["ca_29","ca_32","ca_34"]:
-                    output=2
-                if len(connect["inputs"])!=5 or len(connect["outputs"])!=output:
-                    raise ValueError(f"Compressor_4_2 {adder_id} is not correct,inputs:{len(connect['inputs'])},outputs:{len(connect['outputs'])}")
+    def convert_mode(self,adder_id):
+        if adder_id in self.forward_sequence["adders"]:
+            adder_tag_id=self.forward_sequence["adders"][adder_id]
+        elif adder_id in self.adder_dict:
+            adder_tag_id=adder_id
+        else:
+            raise ValueError(f"Invalid adder ID: {adder_id}")
+        
+        self.adder_dict[adder_tag_id].convert_mode()
+
+    def write_csv_file(self,file_dir="./mul_step"):
+        import os
+        if not os.path.exists(file_dir):
+            os.makedirs(file_dir)
+        temp_register_list=[
+            f"w{i}" for i in range(64) 
+        ]
+        input_register_list=[
+            f"a{i}" for i in range(8)
+        ]+[
+            f"b{i}" for i in range(8)
+        ]
+        output_register_list=[
+            f"y{i}" for i in range(16)
+        ]
+        register_list=temp_register_list+input_register_list+output_register_list+["S1","S2","temp_store","Cin"]
+        register_list = [item for switch in register_list for item in [switch, f"{switch}_sw"]]
+        generation_operation_time={
+            key:[["0u",0]] for key in register_list
+        }
+
+        temp_value_record_dict={}
+        for index,value in self.forward_sequence["middle_values"].items():
+            operation_sequence=self.adder_dict[value].operation_sequence
+            replace_name_dict=self.adder_dict[value].input_value 
+            replace_name_dict={str(key):str(value) for key,value in replace_name_dict.items()}   
+            generate_operation_time(generation_operation_time,operation_sequence,replace_name_dict)
+            output_switch=self.adder_dict[value].output_switch_dict
+            for key,output_name in output_switch.items():
+                # only sum need to be stored
+                False_logic(generation_operation_time,"temp_store")
+                Implication(generation_operation_time,key,"temp_store")
+                w_indx=int(value[1])*8+int(value[3])
+                False_logic(generation_operation_time,f"w{w_indx}")
+                Implication(generation_operation_time,"temp_store",f"w{w_indx}")
+            temp_value_record_dict[value]={"Sum":f"w{w_indx}"}     
+        for index,value in self.forward_sequence["adders"].items():
+            operation_sequence=self.adder_dict[value].operation_sequence
+            connect=self.connections[value]
+            inputs=connect["inputs"]
+
+            inputs={k:temp_value_record_dict[v[0]][v[1]] for k,v in inputs.items()}
+            generate_operation_time(generation_operation_time,operation_sequence,inputs)
+            output_switch=self.adder_dict[value].output_switch_dict
+            can_store_dict={
+                key: True for key in inputs.keys()
+            }
+            for idx,(key,output_name) in enumerate(output_switch.items()):
+                if key in inputs.keys():
+                    if value in temp_value_record_dict.keys():
+                        temp_value_record_dict[value][output_name]=inputs[key]
+                    else:
+                        temp_value_record_dict[value]={output_name:inputs[key]}
+                    can_store_dict[key]=False
+                else:
+                    true_key=[k for k,v in can_store_dict.items() if v==True][0]
+                    can_store_dict[true_key]=False
+                    False_logic(generation_operation_time,"temp_store")
+                    Implication(generation_operation_time,key,"temp_store")
+                    False_logic(generation_operation_time,inputs[true_key])
+                    Implication(generation_operation_time,"temp_store",inputs[true_key])
+                    if value in temp_value_record_dict.keys():
+                        temp_value_record_dict[value][output_name]=inputs[true_key]
+                    else:
+                        temp_value_record_dict[value]={output_name:inputs[true_key]}
+        for output_value,transfoer_node in self.output_logic_expression.items():
+            transfoer_node=list(transfoer_node.keys())+list(transfoer_node.values())
+            False_logic(generation_operation_time,"temp_store")
+            Implication(generation_operation_time,temp_value_record_dict[transfoer_node[0]][transfoer_node[1]],"temp_store")
+            False_logic(generation_operation_time,output_value)
+            Implication(generation_operation_time,"temp_store",output_value)
+
+        
+        generate_csv_file(file_dir,generation_operation_time)
+
+def generate_operation_time(generation_operation_time,operation_list,replace_name_dict):
+    for operation in operation_list:
+        operation=operation.replace("(Sum)","")
+        operation=operation.replace("(Cout)","")
+        operation=operation.replace("(Carry)","")
+        if operation=="":
+            continue
+        if "=0" in operation:
+            switch_name=operation.replace("=0","")
+            switch_name=replace_name_dict.get(switch_name,switch_name)
+            False_logic(generation_operation_time,switch_name)
+        elif "->" in operation:
+            operation_list=operation.split("->")
+            swich_a=operation_list[0]
+            swich_b=operation_list[1]
+            swich_a=replace_name_dict.get(swich_a,swich_a)
+            swich_b=replace_name_dict.get(swich_b,swich_b)
+            
+            Implication(generation_operation_time,swich_a,swich_b)
+        else:
+            raise Exception("operation not supported")
+    return generation_operation_time
+
+def False_logic(generation_operation_time,switch_name):
+    if switch_name not in generation_operation_time:
+        raise Exception("switch_name not in generation_operation_time")
+    for key in generation_operation_time.keys():
+        last_operation=generation_operation_time[key][-1]
+        operation_start_time=get_operation_start_time(last_operation)
+        if switch_name==key:
+            generation_operation_time[key].append([f"{operation_start_time}u",'-1'])
+            generation_operation_time[key].append([f"{int(operation_start_time)+30}u",'-1'])
+        elif switch_name+"_sw"==key:
+            generation_operation_time[key].append([f"{operation_start_time}u",'1'])
+            generation_operation_time[key].append([f"{int(operation_start_time)+30}u",'1'])
+        else:
+            generation_operation_time[key].append([f"{operation_start_time}u",0])
+            generation_operation_time[key].append([f"{int(operation_start_time)+30}u",'0'])
+
+def get_operation_start_time(last_operation):
+    last_operation_time=int(last_operation[0].replace("u",""))
+    operation_start_time=last_operation_time+0.001
+    return operation_start_time
+
+def Implication(generation_operation_time,swich_a,swich_b):
+    if swich_a not in generation_operation_time or swich_b not in generation_operation_time:
+        raise Exception(f"switch_name not in generation_operation_time {swich_a},{swich_b}")
+    for key in generation_operation_time.keys():
+        last_operation=generation_operation_time[key][-1]
+        operation_start_time=get_operation_start_time(last_operation)
+        if swich_a==key:
+            generation_operation_time[key].append([f"{operation_start_time}u",'900m'])
+            generation_operation_time[key].append([f"{int(operation_start_time)+30}u",'900m'])
+        elif swich_a+"_sw"==key:
+            generation_operation_time[key].append([f"{operation_start_time}u",'1'])
+            generation_operation_time[key].append([f"{int(operation_start_time)+30}u",'1'])
+        elif swich_b==key:
+            generation_operation_time[key].append([f"{operation_start_time}u",'1'])
+            generation_operation_time[key].append([f"{int(operation_start_time)+30}u",'1'])
+        elif swich_b+"_sw"==key:
+            generation_operation_time[key].append([f"{operation_start_time}u",'1'])
+            generation_operation_time[key].append([f"{int(operation_start_time)+30}u",'1'])
+        else:
+            generation_operation_time[key].append([f"{operation_start_time}u",'0'])
+            generation_operation_time[key].append([f"{int(operation_start_time)+30}u",'0'])
+
+def generate_csv_file(fold_dir,generation_operation_time):
+    for key,values in generation_operation_time.items():
+        with open(f"{fold_dir}/{key}.csv","w") as f:
+            for value in values:
+                f.write(f"{value[0]},{value[1]}\n")
+            f.close()

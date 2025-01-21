@@ -2,7 +2,7 @@ import copy
 import matplotlib.pyplot as plt
 import networkx as nx
 
-from sympy import Symbol,simplify
+from sympy import Symbol
 from sympy.logic.boolalg import Not,Or
 
 class Component:

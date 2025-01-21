@@ -1,4 +1,3 @@
-from itertools import product
 from random import randint, seed
 import numpy as np
 from core import Multiplier
@@ -98,6 +97,7 @@ def evaluate(mul):
 if __name__ == "__main__":
     mul = Multiplier()
     mul.support_drop_type()
+    mul.visualize_dependency_graph()
     evaluate_value = evaluate(mul)
     print(f"Evaluation Value: {evaluate_value}")
     # support direct index drop

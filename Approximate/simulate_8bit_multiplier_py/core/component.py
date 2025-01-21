@@ -59,6 +59,8 @@ class BasicAdder:
         self.output_name = []
         self.operation_sequence = []
         self.adder_id = 0
+        self.input_name = []
+        self.drop_type=[]
     
     def _build_graph(self):
         def _check_output(switch_name,output_name_list):
@@ -139,6 +141,8 @@ class BasicAdder:
         if drop_output_name not in self.output_name:
             raise ValueError(f"Invalid output name: {drop_output_name}")
 
+        if drop_output_name not in self.drop_type:
+            self.drop_type.append(drop_output_name)
         necessary_nodes = set()
 
         output_nodes=[]
@@ -175,6 +179,23 @@ class BasicAdder:
             if value == drop_output_name:
                 self.node_dict[key]=Component(switch_name=key, type="deleted", logic_expression=False,index=self.index)
                 self.index+=1
+
+        operation_sequence = []
+        for node in self.dependency_graph:
+            if "UPDATE" in node["operation"]:
+                continue
+            operation_sequence.append(node["operation"])
+        for index in range(len(operation_sequence)-1,-1,-1):
+            if "(" not in operation_sequence[index] and "->" in operation_sequence[index]:
+                switch_name=operation_sequence[index].split("->")[1]
+                if switch_name in self.output_switch_dict:
+                    continue
+                if switch_name not in self.input_name:
+                    continue
+                operation_sequence[index]=operation_sequence[index]+f"({drop_output_name})"
+                break
+        self.operation_sequence = operation_sequence
+        self._build_graph()
             
     def operation_step(self):
         step=0

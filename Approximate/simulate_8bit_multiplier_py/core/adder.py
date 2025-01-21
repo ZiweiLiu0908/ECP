@@ -9,6 +9,7 @@ class Compressor_4_2(BasicAdder):
     def __init__(self):
         super().__init__()
         self.switch_list = ["S1", "S2", "X1", "X2", "X3", "X4", "Cin"]
+        self.input_name = ["X1", "X2", "X3", "X4"]
         self.output_name = ["Sum", "Carry","Cout"]
 
         self.operation_sequence = [
@@ -88,6 +89,9 @@ class Compressor_4_2(BasicAdder):
         self.operation_sequence=self.approximation_sequence
         self.approximation_sequence=temp
         self._build_graph()
+        if len(self.drop_type)>0:
+            for drop in self.drop_type:
+                self.drop_output(drop)
         if self.adder_type=="exact":
             self.adder_type="approximate"
         else:
@@ -99,6 +103,7 @@ class HalfAdder(BasicAdder):
         super().__init__()
         self.switch_list = ["X1", "X2","S1","S2"]
         self.output_name = ["Sum", "Cout"]
+        self.input_name=["X1","X2"]
 
         self.operation_sequence = [
             "S1=0",
@@ -122,6 +127,7 @@ class FullAdder(BasicAdder):
         super().__init__()
         self.switch_list = ["X1","X2","Cin","S1","S2"]
         self.output_name = ["Sum", "Cout"]
+        self.input_name = ["X1","X2"]
 
         self.operation_sequence = [
             "S1=0",
@@ -154,6 +160,7 @@ class AND_GATE(BasicAdder):
         super().__init__()
         self.switch_list = ["X1","X2","S1","S2"]
         self.output_name = ["Sum"]
+        self.input_name = ["X1","X2"]
         self.operation_sequence=[
             "S1=0",
             "X2->S1",

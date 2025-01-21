@@ -427,7 +427,7 @@ class Multiplier:
 
     def drop_adder_Carry_or_Cout(self,adder_id,tag):
         if adder_id in self.forward_sequence["adders"]:
-            adder_tag_id=self.forward_sequence["adders"][adder_id]
+            adder_tag_id=self.forward_sequence["adders"][adder_id-1]
         elif adder_id in self.adder_dict:
             adder_tag_id=adder_id
         else:

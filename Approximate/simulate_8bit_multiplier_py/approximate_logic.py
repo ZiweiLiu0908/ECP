@@ -1,7 +1,5 @@
-from itertools import product
 import itertools
-from sympy import Nor, Symbol, approximants, simplify_logic, symbols, Implies, Not, Or, And, Equivalent, Xor,cse
-from core import Compressor_4_2,Approximate_Comp_4_2
+from sympy import Nor, symbols,Or, And,  Xor
 
 
 X1, X2, X3, X4, Cin = symbols('X1 X2 X3 X4 Cin')

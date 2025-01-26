@@ -38,7 +38,7 @@ $$
 S &=\overline{X_3}+\overline{X_1}\cdot \overline{X_2}+X_1\cdot X_2 \\
 Cout &= X_1\cdot X_2+X_3\cdot (X_1\oplus X_2)\\
 Carry &= S\cdot X_4+C_{in}\\
-Sum &= \overline{(S,X_4)\oplus C_{in}}
+Sum &= \overline{Carry}
 \end{align}
 $$
 

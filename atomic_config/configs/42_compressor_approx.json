@@ -1,0 +1,11 @@
+{
+    "topology": "Serial-Mult",
+    "algorithm": "42_compressor_approx.txt",
+    "memristors": ["a", "b", "c", "d", "w1", "w2", "cin"],
+    "inputs": ["a", "b", "c", "d","cin"],
+    "work": ["w1", "w2"],
+    "outputs": ["Sum", "Carry","Cout"],
+    "switches": ["a_sw", "b_sw", "c_sw", "d_sw", "w1_sw", "w2_sw", "cin_sw"],
+    "steps": 21,
+    "output_states": {}
+  }
